@@ -3,21 +3,35 @@ import statistics
 def getNodesToRemove(input_tree, input_threshold):
     
     branch_lengths = [nodes.dist for nodes in input_tree.traverse('preorder')]
-    mean_bl = statistics.mean(branch_lengths)
-    std_bl = statistics.stdev(branch_lengths)
-    threshold = std_bl*input_threshold + mean_bl
+    shortest_bl = min(i for i in branch_lengths if i !=0)
     
     long_branches_leaves = []
 
     for node in input_tree.traverse('preorder'):
-        node.resolve_polytomy()
-        if node.dist > threshold:
-            leaves = node.get_leaf_names()
-            if len(leaves) < 0.8 * len(input_tree.get_leaf_names()):
-                long_branches_leaves.append(leaves)
-    long_branches = [j for i in long_branches_leaves for j in i]
+        if node.dist == shortest_bl:
+            new_root_taxa=node.get_leaf_names()    
+            if len(new_root_taxa) > 1:
+                new_root_node=node.get_common_ancestor(new_root_taxa)
+                input_tree.set_outgroup(new_root_node)
+            else:
+                input_tree.set_outgroup(new_root_taxa[0])
+            
+            branch_lengths_rooted = [node.dist for node in input_tree.traverse('preorder')]
+            mean_bl_rooted = statistics.mean(branch_lengths_rooted)
+            sd_bl_rooted = statistics.stdev(branch_lengths_rooted)
+            threshold_rooted = (sd_bl_rooted * input_threshold)+ mean_bl_rooted
+                
+            for node in input_tree.traverse('preorder'):
+                if node.dist > threshold_rooted:
+                    leaves = node.get_leaf_names()
+                    if len(leaves) < 0.5 * len(input_tree.get_leaf_names()):
+                        long_branches_leaves.append(leaves)
 
-    return list(set(long_branches))
+    long_branches = [j for i in long_branches_leaves for j in i]
+    long_branches_final = list(set(long_branches))
+    
+    return long_branches_final
+
 
 
 def RemoveSequences(input_tree, input_fasta, long_branches):
@@ -33,3 +47,4 @@ def RemoveSequences(input_tree, input_fasta, long_branches):
         if stripped[i][1:] not in long_branches_sorted:
             output.write(stripped[i]+ "\n")
             output.write(stripped[i+1] + "\n")
+
